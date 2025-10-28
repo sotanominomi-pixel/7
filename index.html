@@ -1,0 +1,216 @@
+ <!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>N Clock</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+    body {
+        background: #000;
+        font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        color: white;
+        text-align: center;
+    }
+
+    .time-display {
+        font-size: 80px;
+        font-weight: 600;
+        letter-spacing: 3px;
+        margin-bottom: 30px;
+    }
+
+    .slider-container {
+        width: 80%;
+        margin: 20px 0;
+    }
+
+    input[type="range"] {
+        -webkit-appearance: none;
+        width: 100%;
+        height: 10px;
+        background: #444;
+        border-radius: 5px;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 30px;
+        height: 30px;
+        background: #222;
+        border-radius: 50%;
+        border: 3px solid white;
+    }
+
+    .tab-buttons button {
+        font-size: 20px;
+        padding: 10px 25px;
+        border-radius: 12px;
+        border: none;
+        background: #333;
+        color: white;
+        margin: 10px;
+    }
+
+    .tab-buttons .active {
+        background: white;
+        color: black;
+        font-weight: bold;
+    }
+
+    .control-buttons button {
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        border: none;
+        font-size: 20px;
+        color: white;
+        margin: 10px;
+    }
+
+    .start { background: #00c853; }
+    .stop  { background: #d50000; }
+    .lap   { background: #333; }
+    .reset { background: #666; }
+
+    .lap-list {
+        margin-top: 15px;
+        width: 80%;
+        max-height: 200px;
+        overflow-y: auto;
+        text-align: left;
+        font-size: 22px;
+    }
+</style>
+</head>
+<body>
+
+<div class="time-display" id="timeDisplay">00:00:00</div>
+
+<!-- Slider -->
+<div class="slider-container">
+    <input type="range" id="hourSlider" min="12" max="48" value="24">
+</div>
+<p id="hourLabel">1日の長さ：24 時間</p>
+
+<!-- Tab Switch -->
+<div class="tab-buttons">
+    <button id="clockTab" class="active">時計</button>
+    <button id="stopwatchTab">ストップウォッチ</button>
+</div>
+
+<!-- Stopwatch Controls -->
+<div class="control-buttons" id="stopwatchControls" style="display:none;">
+    <button id="startStopBtn" class="start">START</button>
+    <button id="lapBtn" class="lap" disabled>LAP</button>
+    <button id="resetBtn" class="reset" disabled>RESET</button>
+</div>
+
+<div class="lap-list" id="lapList"></div>
+
+<script>
+let mode = "clock";
+let customHours = 24;
+let running = false;
+let startTime, elapsed = 0;
+let laps = [];
+
+document.getElementById("hourSlider").addEventListener("input", e => {
+    customHours = Number(e.target.value);
+    document.getElementById("hourLabel").textContent =
+        `1日の長さ：${customHours} 時間`;
+});
+
+// Clock update
+function updateClock() {
+    const now = new Date();
+    const realSeconds = now.getSeconds() + now.getMinutes()*60 + now.getHours()*3600;
+    const speed = 24 / customHours;
+    const totalSeconds = realSeconds * speed;
+
+    const h = Math.floor(totalSeconds / 3600) % customHours;
+    const m = Math.floor(totalSeconds / 60) % 60;
+    const s = Math.floor(totalSeconds) % 60;
+
+    document.getElementById("timeDisplay").textContent =
+        `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+}
+
+// Stopwatch update
+function updateStopwatch() {
+    if (running) {
+        const now = performance.now();
+        const delta = (now - startTime) * (24/customHours);
+        startTime = now;
+        elapsed += delta;
+    }
+
+    const totalSec = elapsed/1000;
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor(totalSec / 60) % 60;
+    const s = Math.floor(totalSec) % 60;
+
+    document.getElementById("timeDisplay").textContent =
+        `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+}
+
+// Tabs
+document.getElementById("clockTab").addEventListener("click", () => {
+    mode = "clock";
+    document.getElementById("clockTab").classList.add("active");
+    document.getElementById("stopwatchTab").classList.remove("active");
+    document.getElementById("stopwatchControls").style.display = "none";
+    document.getElementById("lapList").style.display = "none";
+});
+
+document.getElementById("stopwatchTab").addEventListener("click", () => {
+    mode = "stopwatch";
+    document.getElementById("stopwatchTab").classList.add("active");
+    document.getElementById("clockTab").classList.remove("active");
+    document.getElementById("stopwatchControls").style.display = "block";
+    document.getElementById("lapList").style.display = "block";
+});
+
+// Stopwatch Buttons
+document.getElementById("startStopBtn").addEventListener("click", () => {
+    running = !running;
+    if (running) {
+        startTime = performance.now();
+        document.getElementById("startStopBtn").textContent = "STOP";
+        document.getElementById("startStopBtn").className = "controlButtons stop";
+        document.getElementById("lapBtn").disabled = false;
+        document.getElementById("resetBtn").disabled = true;
+    } else {
+        document.getElementById("startStopBtn").textContent = "START";
+        document.getElementById("startStopBtn").className = "controlButtons start";
+        document.getElementById("lapBtn").disabled = true;
+        document.getElementById("resetBtn").disabled = false;
+    }
+});
+
+// Lap
+document.getElementById("lapBtn").addEventListener("click", () => {
+    laps.push(document.getElementById("timeDisplay").textContent);
+    const list = laps.map((t,i)=>`Lap ${i+1}　${t}`).join("<br>");
+    document.getElementById("lapList").innerHTML = list;
+});
+
+// Reset
+document.getElementById("resetBtn").addEventListener("click", () => {
+    elapsed = 0;
+    laps = [];
+    document.getElementById("lapList").innerHTML = "";
+});
+
+setInterval(()=>{
+    if (mode==="clock") updateClock();
+    else updateStopwatch();
+},100);
+</script>
+</body>
+</html>
